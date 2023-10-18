@@ -44,26 +44,26 @@ def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
 
 def execute_encode(video_path: str):
     clip = VideoFileClip(video_path)
-    clip.write_videofile(f"{clip.filename}.mp4")
+    clip_name = clip.filename.split('.')[0]
+    clip.write_videofile(f"{clip_name}.mp4")
 
 
 def main():
-    execute_encode("evagalion_op.avi")
-    # LOG.info('Starting a worker...')
-    # LOG.info('Unique name: %s', INSTANCE_NAME)
-    # host, *port_info = REDIS_QUEUE_LOCATION.split(':')
-    # port = tuple()
-    # if port_info:
-    #     port, *_ = port_info
-    #     port = (int(port),)
-    #
-    # named_logging = LOG.getLogger(name=INSTANCE_NAME)
-    # named_logging.info('Trying to connect to %s [%s]', host, REDIS_QUEUE_LOCATION)
-    # redis_conn = redis.Redis(host=host, *port)
-    # watch_queue(
-    #     redis_conn,
-    #     QUEUE_NAME,
-    #     lambda task: named_logging.info('Task: %s', task))
+    LOG.info('Starting a worker...')
+    LOG.info('Unique name: %s', INSTANCE_NAME)
+    host, *port_info = REDIS_QUEUE_LOCATION.split(':')
+    port = tuple()
+    if port_info:
+        port, *_ = port_info
+        port = (int(port),)
+
+    named_logging = LOG.getLogger(name=INSTANCE_NAME)
+    named_logging.info('Trying to connect to %s [%s]', host, REDIS_QUEUE_LOCATION)
+    redis_conn = redis.Redis(host=host, *port)
+    watch_queue(
+        redis_conn,
+        QUEUE_NAME,
+        execute_encode)
 
 
 if __name__ == '__main__':

@@ -39,19 +39,7 @@ def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
             except Exception:
                 LOG.exception('json.loads failed')
             if task:
-                callback_func(task)
-
-
-def execute_factor(log, task):
-    number = task.get('number')
-    if number:
-        number = int(number)
-        log.info('Factoring %d', number)
-        factors = [trial for trial in range(1, number + 1) if number % trial == 0]
-        log.info('Done, factors = %s', factors)
-    else:
-        log.info('No number given.')
-
+                callback_func(task["name"])
 
 def main():
     LOG.info('Starting a worker...')

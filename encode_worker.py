@@ -27,7 +27,6 @@ def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
         if not packed:
             # if nothing is returned, poll a again
             continue
-
         _, packed_task = packed
 
         # If it's treated to a poison pill, quit the loop
@@ -39,8 +38,10 @@ def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
                 task = json.loads(packed_task)
             except Exception:
                 LOG.exception('json.loads failed')
+                redis_conn.publish("encode", "failed")
             if task:
                 callback_func(task["name"])
+                redis_conn.publish("encode", "ok")
 
 def execute_encode(video_path: str):
     clip = VideoFileClip(video_path)

@@ -6,7 +6,9 @@ import redis
 from moviepy.editor import VideoFileClip
 
 LOG = logging
+# Redis Credentials
 REDIS_QUEUE_LOCATION = os.getenv('REDIS_QUEUE', 'localhost')
+# Queue name for listening
 QUEUE_NAME = 'queue:encode'
 
 INSTANCE_NAME = uuid.uuid4().hex
@@ -17,6 +19,7 @@ LOG.basicConfig(
 )
 
 
+# function to watch queue and fetch work
 def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
     active = True
 
@@ -42,7 +45,7 @@ def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
             if task:
                 callback_func(task["name"])
                 redis_conn.publish("encode", "ok")
-
+# encode logic, simply save into different signature
 def execute_encode(video_path: str):
     clip = VideoFileClip(video_path)
     clip_name = clip.filename.split('.')[0]

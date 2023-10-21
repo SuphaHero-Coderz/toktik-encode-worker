@@ -48,11 +48,11 @@ def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
                 print(task)
             except Exception:
                 LOG.exception('json.loads failed')
-                data = { "status" : "-1", "message" : "An error occurred" }
+                data = { "status" : -1, "message" : "An error occurred" }
                 redis_conn.publish("encode", json.dumps(data))
             if task:
                 callback_func(task["object_key"])
-                data = { "status" : "1", "message" : "Successfully converted video" }
+                data = { "status" : 1, "message" : "Successfully converted video" }
                 redis_conn.publish("encode", json.dumps(data))
 
 def download_video(object_key: str):

@@ -48,10 +48,12 @@ def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
                 print(task)
             except Exception:
                 LOG.exception('json.loads failed')
-                redis_conn.publish("encode", "failed")
+                data = { "status" : "-1", "message" : "An error occurred" }
+                redis_conn.publish("encode", json.dumps(data))
             if task:
                 callback_func(task["object_key"])
-                redis_conn.publish("encode", "ok")
+                data = { "status" : "1", "message" : "Successfully converted video" }
+                redis_conn.publish("encode", json.dumps(data))
 
 def download_video(object_key: str):
     try:
@@ -72,7 +74,7 @@ def delete_video(object_key: str):
 def upload_video(object_key: str):
     LOG.info("Uploading converted video")
     try:
-        s3.upload_file(f"./{object_key}.mp4", os.getenv("BUCKET_NAME"), f"{object_key}.mp4")    
+        s3.upload_file(f"./{object_key}.mp4", os.getenv("BUCKET_NAME"), f"{object_key}/encoded.mp4")    
         LOG.info("Successfully uploaded converted video")
     except botocore.exceptions.ClientError as e:
         LOG.error(e)

@@ -9,7 +9,6 @@ RUN pip install -r /app/requirements.txt
 
 # Copy everthing from . to /app inside the 'box'
 COPY encode_worker.py /app
-COPY sample.avi /app
 WORKDIR /app
 
 # How to run it when we start up the box?

@@ -3,6 +3,8 @@ import logging
 import json
 import uuid
 import redis
+import boto3
+import botocore
 from moviepy.editor import VideoFileClip
 
 LOG = logging
@@ -18,6 +20,10 @@ LOG.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
+s3 = boto3.client('s3', 
+    aws_access_key_id = os.getenv("AWS_ACCESS_KEY"),
+    aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY"),
+)
 
 # function to watch queue and fetch work
 def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
@@ -39,18 +45,51 @@ def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
             task = None
             try:
                 task = json.loads(packed_task)
+                print(task)
             except Exception:
                 LOG.exception('json.loads failed')
                 redis_conn.publish("encode", "failed")
             if task:
-                callback_func(task["name"])
+                callback_func(task["object_key"])
                 redis_conn.publish("encode", "ok")
-# encode logic, simply save into different signature
-def execute_encode(video_path: str):
-    clip = VideoFileClip(video_path)
-    clip_name = clip.filename.split('.')[0]
-    clip.write_videofile(f"{clip_name}.mp4")
 
+def download_video(object_key: str):
+    try:
+        LOG.info("Downloading file from S3 for conversion")
+        s3.download_file(os.getenv("BUCKET_NAME"), object_key, f"./{object_key}")
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] == "404":
+            LOG.error("ERROR: file was not found on S3")
+        else:
+            LOG.error("ERROR: file download")
+            raise
+
+def delete_video(object_key: str):
+    LOG.info("Deleting original video")
+    response = s3.delete_object(Bucket=os.getenv("BUCKET_NAME"), Key=object_key)
+    LOG.info(response)
+
+def upload_video(object_key: str):
+    LOG.info("Uploading converted video")
+    try:
+        s3.upload_file(f"./{object_key}.mp4", os.getenv("BUCKET_NAME"), f"{object_key}.mp4")    
+        LOG.info("Successfully uploaded converted video")
+    except botocore.exceptions.ClientError as e:
+        LOG.error(e)
+
+def convert_video(object_key: str):
+    clip = VideoFileClip(f"./{object_key}")
+    clip_name = clip.filename.split('.')[0]
+    clip.write_videofile(f"{object_key}.mp4")
+    LOG.info("Successfully converted video")
+
+
+# encode logic, simply save into different signature
+def execute_encode(object_key: str):
+    download_video(object_key)
+    convert_video(object_key)
+    delete_video(object_key)
+    upload_video(object_key)
 
 def main():
     LOG.info('Starting a worker...')

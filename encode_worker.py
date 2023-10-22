@@ -85,6 +85,14 @@ def convert_video(object_key: str):
     clip.write_videofile(f"{object_key}.mp4")
     LOG.info("Successfully converted video")
 
+def cleanup(object_key):
+    try:
+        os.remove(f"./{object_key}")
+        os.remove(f"./{object_key}.mp4")
+        LOG.info("All files deleted successfully.")
+    except OSError:
+        LOG.error("Error occurred while deleting files.")
+
 
 # encode logic, simply save into different signature
 def execute_encode(object_key: str):
@@ -92,6 +100,7 @@ def execute_encode(object_key: str):
     convert_video(object_key)
     delete_video(object_key)
     upload_video(object_key)
+    cleanup(object_key)
 
 def main():
     LOG.info('Starting a worker...')

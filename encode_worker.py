@@ -52,8 +52,8 @@ def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
                 redis_conn.publish("encode", json.dumps(data))
             if task:
                 callback_func(task["object_key"])
-                data = { "status" : 1, "message" : "Successfully converted video" }
-                redis_conn.publish("encode", json.dumps(data))
+                data = { "status" : 1, "message" : task["object_key"]}
+                redis_conn.publish("encode", json.dumps(task))
 
 def download_video(object_key: str):
     try:
@@ -96,6 +96,7 @@ def cleanup(object_key):
 
 # encode logic, simply save into different signature
 def execute_encode(object_key: str):
+    # print("execute encode")
     download_video(object_key)
     convert_video(object_key)
     delete_video(object_key)

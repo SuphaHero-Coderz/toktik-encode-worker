@@ -6,6 +6,7 @@ import redis
 import boto3
 import botocore
 from moviepy.editor import VideoFileClip
+from tenacity import retry, stop_after_attempt
 
 LOG = logging
 # Redis Credentials
@@ -59,6 +60,7 @@ def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
                 data = { "status" : 1, "message" : task["object_key"]}
                 redis_conn.publish("encode", json.dumps(task))
 
+@retry(stop=stop_after_attempt(5))
 def download_video(object_key: str):
     """
     Downloads the user's unencoded video from S3.
@@ -73,6 +75,7 @@ def download_video(object_key: str):
             LOG.error("ERROR: file download")
             raise
 
+@retry(stop=stop_after_attempt(5))
 def delete_video(object_key: str):
     """
     Deletes the original unencoded video from S3.
@@ -81,6 +84,7 @@ def delete_video(object_key: str):
     response = s3.delete_object(Bucket=os.getenv("BUCKET_NAME"), Key=object_key)
     LOG.info(response)
 
+@retry(stop=stop_after_attempt(5))
 def upload_video(object_key: str):
     """
     Uploads the encoded video to S3.
@@ -92,6 +96,7 @@ def upload_video(object_key: str):
     except botocore.exceptions.ClientError as e:
         LOG.error(e)
 
+@retry(stop=stop_after_attempt(5))
 def convert_video(object_key: str):
     """
     Encodes the video to mp4 format.
@@ -105,6 +110,7 @@ def cleanup(object_key):
     """
     Deletes files involved in encoding process after uploading.
     """
+    @retry(stop=stop_after_attempt(5))
     def delete_file(filepath: str):
         try:
             os.remove(filepath)

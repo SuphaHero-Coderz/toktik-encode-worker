@@ -10,6 +10,7 @@ python = "^3.8"
 redis = "^5.0.1"
 moviepy = "^1.0.3"
 boto3 = "^1.28.68"
+tenacity = "^8.2.3"
 
 
 [build-system]

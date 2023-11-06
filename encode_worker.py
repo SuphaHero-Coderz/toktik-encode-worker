@@ -6,6 +6,7 @@ import redis
 import boto3
 import botocore
 from moviepy.editor import VideoFileClip
+from tenacity import retry, stop_after_attempt
 
 LOG = logging
 # Redis Credentials
@@ -25,8 +26,12 @@ s3 = boto3.client('s3',
     aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY"),
 )
 
-# function to watch queue and fetch work
+ENCODED_FILENAME = "encoded.mp4"
+
 def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
+    """
+    Listens to queue `queue_name` and passes messages to `callback_func`
+    """
     active = True
 
     while active:
@@ -55,7 +60,11 @@ def watch_queue(redis_conn, queue_name, callback_func, timeout=30):
                 data = { "status" : 1, "message" : task["object_key"]}
                 redis_conn.publish("encode", json.dumps(task))
 
+@retry(stop=stop_after_attempt(5))
 def download_video(object_key: str):
+    """
+    Downloads the user's unencoded video from S3.
+    """
     try:
         LOG.info("Downloading file from S3 for conversion")
         s3.download_file(os.getenv("BUCKET_NAME"), object_key, f"./{object_key}")
@@ -66,37 +75,55 @@ def download_video(object_key: str):
             LOG.error("ERROR: file download")
             raise
 
+@retry(stop=stop_after_attempt(5))
 def delete_video(object_key: str):
+    """
+    Deletes the original unencoded video from S3.
+    """
     LOG.info("Deleting original video")
     response = s3.delete_object(Bucket=os.getenv("BUCKET_NAME"), Key=object_key)
     LOG.info(response)
 
+@retry(stop=stop_after_attempt(5))
 def upload_video(object_key: str):
+    """
+    Uploads the encoded video to S3.
+    """
     LOG.info("Uploading converted video")
     try:
-        s3.upload_file(f"./{object_key}.mp4", os.getenv("BUCKET_NAME"), f"{object_key}/encoded.mp4")    
+        s3.upload_file(f"./{object_key}.mp4", os.getenv("BUCKET_NAME"), f"{object_key}/{ENCODED_FILENAME}")    
         LOG.info("Successfully uploaded converted video")
     except botocore.exceptions.ClientError as e:
         LOG.error(e)
 
+@retry(stop=stop_after_attempt(5))
 def convert_video(object_key: str):
+    """
+    Encodes the video to mp4 format.
+    """
     clip = VideoFileClip(f"./{object_key}")
     clip_name = clip.filename.split('.')[0]
     clip.write_videofile(f"{object_key}.mp4")
     LOG.info("Successfully converted video")
 
 def cleanup(object_key):
-    try:
-        os.remove(f"./{object_key}")
-        os.remove(f"./{object_key}.mp4")
-        LOG.info("All files deleted successfully.")
-    except OSError:
-        LOG.error("Error occurred while deleting files.")
+    """
+    Deletes files involved in encoding process after uploading.
+    """
+    @retry(stop=stop_after_attempt(5))
+    def delete_file(filepath: str):
+        try:
+            os.remove(filepath)
+            LOG.info(f"Successfully deleted file: {filepath}")
+        except OSError:
+            LOG.error(f"Error occurred while deleting file: {filepath}")
+    delete_file(f"./{object_key}")
+    delete_file(f"./{object_key}.mp4")
 
-
-# encode logic, simply save into different signature
 def execute_encode(object_key: str):
-    # print("execute encode")
+    """
+    Main process for video encoding
+    """
     download_video(object_key)
     convert_video(object_key)
     delete_video(object_key)
